@@ -4,7 +4,7 @@
 
 ## Run
 
-`node .\slowloris.js --host <host> --port <port>`
+`node .\slowloris.js --host <host> --port <port> ---count <simultaneous connections count>`
 
 ## Beware
 
